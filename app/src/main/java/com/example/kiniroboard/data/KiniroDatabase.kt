@@ -5,7 +5,11 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [Coleccion::class, Entrada::class], version = 1, exportSchema = false)
+@Database(
+    entities = [Coleccion::class, Entrada::class, Obra::class, Capitulo::class],
+    version = 2,
+    exportSchema = false
+)
 abstract class KiniroDatabase : RoomDatabase() {
 
     abstract fun kiniroDao(): KiniroDao
@@ -20,7 +24,9 @@ abstract class KiniroDatabase : RoomDatabase() {
                     context.applicationContext,
                     KiniroDatabase::class.java,
                     "kiniro_board_db"
-                ).build()
+                )
+                    .fallbackToDestructiveMigration(dropAllTables = true)
+                    .build()
                 INSTANCE = instance
                 instance
             }
