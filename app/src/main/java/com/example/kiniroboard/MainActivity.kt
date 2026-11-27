@@ -11,11 +11,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.kiniroboard.data.KiniroDatabase
-import com.example.kiniroboard.data.Obra
 import com.example.kiniroboard.model.Categoria
 import com.example.kiniroboard.repository.KiniroRepository
 import com.example.kiniroboard.ui.PantallaCategoria
 import com.example.kiniroboard.ui.PantallaDetalleColeccion
+import com.example.kiniroboard.ui.PantallaFormulario
 import com.example.kiniroboard.ui.PantallaInicio
 import com.example.kiniroboard.ui.PantallaTableroPrincipal
 import com.example.kiniroboard.ui.theme.KiniroBoardTheme
@@ -36,52 +36,57 @@ class MainActivity : ComponentActivity() {
                 val viewModel: KiniroViewModel = viewModel(factory = viewModelFactory)
                 val navController = rememberNavController()
 
+                // Convierte el texto de la ruta ("MANGAS") en la categoría del enum
+                fun categoriaDe(valor: String?): Categoria =
+                    Categoria.entries.firstOrNull { it.name == valor } ?: Categoria.ANIME
+
                 NavHost(
                     navController = navController,
                     startDestination = "inicio"
                 ) {
-                    // ① INICIO: las píldoras de categorías
+                    // ① INICIO
                     composable("inicio") {
                         PantallaInicio(
                             viewModel = viewModel,
                             onAbrirCategoria = { categoria ->
-                                navController.navigate("categoria/${categoria.name}")   // ← CAMBIÓ
+                                navController.navigate("categoria/${categoria.name}")
                             }
                         )
                     }
 
-                    // ② CATEGORÍA: la pantalla nueva de la Fase 5   ← NUEVO BLOQUE
+                    // ② CATEGORÍA
                     composable(
                         route = "categoria/{cat}",
                         arguments = listOf(navArgument("cat") { type = NavType.StringType })
                     ) { entrada ->
-                        val categoria = Categoria.entries.firstOrNull {
-                            it.name == entrada.arguments?.getString("cat")
-                        } ?: Categoria.ANIME
-
+                        val categoria = categoriaDe(entrada.arguments?.getString("cat"))
                         PantallaCategoria(
                             categoria = categoria,
                             viewModel = viewModel,
                             onVolver = { navController.popBackStack() },
-                            onNuevo = {
-                                // TEMPORAL (en la Fase 6 se cambia por el formulario):
-                                // crea una obra de prueba para poder probar la pantalla
-                                viewModel.guardarObra(
-                                    Obra(
-                                        categoria = categoria.name,
-                                        titulo = "Prueba ${(100..999).random()}",
-                                        totalCapitulos = if (categoria == Categoria.PELICULAS) 1 else 24,
-                                        plataforma = "Crunchyroll"
-                                    ),
-                                    imagenAnterior = null
-                                )
-                            },
-                            onEditar = { /* TEMPORAL: Fase 6 */ },
+                            onNuevo = { navController.navigate("formulario/${categoria.name}") },              // ← CAMBIÓ
+                            onEditar = { id -> navController.navigate("formulario/${categoria.name}?obraId=$id") }, // ← CAMBIÓ
                             onCronologia = { /* TEMPORAL: Fase 7 */ }
                         )
                     }
 
-                    // ③ VIEJAS: ya nadie llega aquí; se borran en la Fase 7
+                    // ③ FORMULARIO (crear y editar)   ← NUEVO
+                    composable(
+                        route = "formulario/{cat}?obraId={obraId}",
+                        arguments = listOf(
+                            navArgument("cat") { type = NavType.StringType },
+                            navArgument("obraId") { type = NavType.IntType; defaultValue = -1 }
+                        )
+                    ) { entrada ->
+                        PantallaFormulario(
+                            categoria = categoriaDe(entrada.arguments?.getString("cat")),
+                            obraId = entrada.arguments?.getInt("obraId")?.takeIf { it > 0 },
+                            viewModel = viewModel,
+                            onCerrar = { navController.popBackStack() }
+                        )
+                    }
+
+                    // ④ VIEJAS: se borran en la Fase 7
                     composable("tablero_principal") {
                         PantallaTableroPrincipal(
                             viewModel = viewModel,
