@@ -45,3 +45,7 @@ fun Filtro.etiqueta(categoria: Categoria): String = when (this) {
     Filtro.FINALIZADOS -> categoria.genero("Finalizados", "Finalizadas")
     Filtro.TODOS -> categoria.genero("Todos", "Todas")
 }
+
+/** Convierte el texto guardado en la BD ("MANGAS") en la categoría del enum */
+fun categoriaPorNombre(valor: String?): Categoria =
+    Categoria.entries.firstOrNull { it.name == valor } ?: Categoria.ANIME

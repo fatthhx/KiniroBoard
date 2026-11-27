@@ -6,8 +6,8 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [Coleccion::class, Entrada::class, Obra::class, Capitulo::class],
-    version = 2,
+    entities = [Obra::class, Capitulo::class, Cronologia::class, EntradaCronologia::class],
+    version = 4,
     exportSchema = false
 )
 abstract class KiniroDatabase : RoomDatabase() {

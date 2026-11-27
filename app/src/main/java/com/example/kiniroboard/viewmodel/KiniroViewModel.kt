@@ -4,12 +4,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.kiniroboard.data.Capitulo
-import com.example.kiniroboard.data.Coleccion
-import com.example.kiniroboard.data.Entrada
-import com.example.kiniroboard.data.EventoCronologia
+import com.example.kiniroboard.data.Cronologia
+import com.example.kiniroboard.data.CronologiaConEntradas
+import com.example.kiniroboard.data.EntradaConObra
+import com.example.kiniroboard.data.EntradaCronologia
 import com.example.kiniroboard.data.Obra
 import com.example.kiniroboard.data.ObraConCapitulos
+import com.example.kiniroboard.data.desdeEfectivo
 import com.example.kiniroboard.data.estado
+import com.example.kiniroboard.data.hastaEfectivo
 import com.example.kiniroboard.model.Categoria
 import com.example.kiniroboard.model.Estado
 import com.example.kiniroboard.model.Filtro
@@ -24,42 +27,14 @@ import kotlinx.coroutines.withContext
 @OptIn(ExperimentalCoroutinesApi::class)
 class KiniroViewModel(private val repository: KiniroRepository) : ViewModel() {
 
-    private val _filtroCategoria = MutableStateFlow("Todos")
-    val filtroCategoria: StateFlow<String> = _filtroCategoria.asStateFlow()
+    // ======================= OBRAS Y CAPÍTULOS =======================
 
-    val colecciones: StateFlow<List<Coleccion>> = combine(
-        repository.todasLasColecciones, _filtroCategoria
-    ) { lista, categoria ->
-        if (categoria == "Todos") lista else lista.filter { it.categoria.equals(categoria, ignoreCase = true) }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    fun cambiarFiltro(categoria: String) { _filtroCategoria.value = categoria }
-
-    fun obtenerColeccionPorId(id: Int): StateFlow<Coleccion?> =
-        repository.obtenerColeccion(id).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
-
-    fun obtenerEntradasDeColeccion(coleccionId: Int): StateFlow<List<Entrada>> =
-        repository.obtenerEntradas(coleccionId).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    fun guardarColeccion(coleccion: Coleccion) = viewModelScope.launch {
-        if (coleccion.id == 0) repository.insertarColeccion(coleccion) else repository.actualizarColeccion(coleccion)
-    }
-    fun borrarColeccion(coleccion: Coleccion) = viewModelScope.launch { repository.eliminarColeccion(coleccion) }
-    fun guardarEntrada(entrada: Entrada) = viewModelScope.launch {
-        if (entrada.id == 0) repository.insertarEntrada(entrada) else repository.actualizarEntrada(entrada)
-    }
-    fun borrarEntrada(entrada: Entrada) = viewModelScope.launch { repository.eliminarEntrada(entrada) }
-
-    // ================== NUEVO ==================
-
-    // Categoría abierta y pestaña seleccionada
     private val _categoria = MutableStateFlow(Categoria.ANIME)
     val categoria: StateFlow<Categoria> = _categoria.asStateFlow()
 
     private val _filtro = MutableStateFlow(Filtro.TODOS)
     val filtro: StateFlow<Filtro> = _filtro.asStateFlow()
 
-    // Cuántas obras hay por categoría (pantalla de inicio)
     val conteos: StateFlow<Map<Categoria, Int>> = repository.conteos()
         .map { lista ->
             lista.mapNotNull { conteo ->
@@ -68,7 +43,6 @@ class KiniroViewModel(private val repository: KiniroRepository) : ViewModel() {
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
-    // Obras de la categoría actual, filtradas por la pestaña
     val obras: StateFlow<List<ObraConCapitulos>> = combine(
         _categoria.flatMapLatest { repository.obras(it) },
         _filtro
@@ -81,8 +55,7 @@ class KiniroViewModel(private val repository: KiniroRepository) : ViewModel() {
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val cronologia: StateFlow<List<EventoCronologia>> = _categoria
-        .flatMapLatest { repository.cronologia(it) }
+    val todasLasObras: StateFlow<List<Obra>> = repository.todasLasObras()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun seleccionarCategoria(categoria: Categoria) {
@@ -99,7 +72,6 @@ class KiniroViewModel(private val repository: KiniroRepository) : ViewModel() {
     fun guardarObra(obra: Obra, imagenAnterior: String?) {
         viewModelScope.launch {
             repository.guardarObra(obra)
-            // Si cambió la portada, se borra el archivo viejo
             if (imagenAnterior != null && imagenAnterior != obra.imagenPath) {
                 withContext(Dispatchers.IO) { borrarImagen(imagenAnterior) }
             }
@@ -108,12 +80,11 @@ class KiniroViewModel(private val repository: KiniroRepository) : ViewModel() {
 
     fun eliminarObra(obra: Obra) {
         viewModelScope.launch {
-            repository.eliminarObra(obra) // los capítulos se van en cascada
+            repository.eliminarObra(obra) // capítulos y entradas de cronología se van en cascada
             obra.imagenPath?.let { withContext(Dispatchers.IO) { borrarImagen(it) } }
         }
     }
 
-    // Toque en un número del grid
     fun alternarCapitulo(capitulo: Capitulo) {
         viewModelScope.launch {
             val ahoraVisto = !capitulo.visto
@@ -123,12 +94,19 @@ class KiniroViewModel(private val repository: KiniroRepository) : ViewModel() {
         }
     }
 
-    // Toque en el círculo: terminar todo o reiniciar
     fun marcarTodo(obra: ObraConCapitulos, completa: Boolean) {
+        marcarCapitulos(obra.capitulos, completa)
+    }
+
+    fun restaurarCapitulos(capitulos: List<Capitulo>) {
+        viewModelScope.launch { repository.actualizarCapitulos(capitulos) }
+    }
+
+    private fun marcarCapitulos(capitulos: List<Capitulo>, completa: Boolean) {
         val ahora = System.currentTimeMillis()
         viewModelScope.launch {
             repository.actualizarCapitulos(
-                obra.capitulos.map {
+                capitulos.map {
                     when {
                         completa && !it.visto -> it.copy(visto = true, fechaVisto = ahora)
                         completa -> it
@@ -139,9 +117,60 @@ class KiniroViewModel(private val repository: KiniroRepository) : ViewModel() {
         }
     }
 
-    // Botón "Deshacer"
-    fun restaurarCapitulos(capitulos: List<Capitulo>) {
-        viewModelScope.launch { repository.actualizarCapitulos(capitulos) }
+    // ======================= CRONOLOGÍAS =======================
+
+    val cronologias: StateFlow<List<CronologiaConEntradas>> = repository.cronologias()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Cronología abierta en pantalla (se crea UNA vez; cambia con flatMapLatest)
+    private val _cronologiaId = MutableStateFlow<Int?>(null)
+
+    val cronologiaActual: StateFlow<CronologiaConEntradas?> = _cronologiaId
+        .flatMapLatest { id -> if (id == null) flowOf(null) else repository.cronologia(id) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    fun abrirCronologia(id: Int) { _cronologiaId.value = id }
+
+    fun guardarCronologia(cronologia: Cronologia) {
+        viewModelScope.launch { repository.guardarCronologia(cronologia) }
+    }
+
+    fun eliminarCronologia(cronologia: Cronologia) {
+        viewModelScope.launch { repository.eliminarCronologia(cronologia) }
+    }
+
+    suspend fun obtenerEntradaCronologia(id: Int): EntradaCronologia? = repository.obtenerEntradaCronologia(id)
+
+    fun guardarEntradaCronologia(entrada: EntradaCronologia) {
+        viewModelScope.launch { repository.guardarEntradaCronologia(entrada) }
+    }
+
+    fun eliminarEntradaCronologia(entrada: EntradaCronologia) {
+        viewModelScope.launch { repository.eliminarEntradaCronologia(entrada) }
+    }
+
+    fun restaurarEntradaCronologia(entrada: EntradaCronologia) {
+        viewModelScope.launch { repository.restaurarEntradaCronologia(entrada) }
+    }
+
+    /**
+     * Sube (-1) o baja (+1) una entrada en el orden de la historia.
+     * Solo intercambia su "orden" con la vecina.
+     */
+    fun moverEntrada(ordenadas: List<EntradaConObra>, indice: Int, direccion: Int) {
+        val destino = indice + direccion
+        if (indice !in ordenadas.indices || destino !in ordenadas.indices) return
+        val a = ordenadas[indice].entrada
+        val b = ordenadas[destino].entrada
+        viewModelScope.launch {
+            repository.actualizarEntradasCronologia(listOf(a.copy(orden = b.orden), b.copy(orden = a.orden)))
+        }
+    }
+
+    /** Marca (o desmarca) como vistos solo los capítulos del rango de esa entrada. */
+    fun marcarRango(entrada: EntradaConObra, completa: Boolean) {
+        val rango = entrada.desdeEfectivo..entrada.hastaEfectivo
+        marcarCapitulos(entrada.obra.capitulos.filter { it.numero in rango }, completa)
     }
 }
 

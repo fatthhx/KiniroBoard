@@ -11,13 +11,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.kiniroboard.data.KiniroDatabase
-import com.example.kiniroboard.model.Categoria
+import com.example.kiniroboard.model.categoriaPorNombre
 import com.example.kiniroboard.repository.KiniroRepository
 import com.example.kiniroboard.ui.PantallaCategoria
-import com.example.kiniroboard.ui.PantallaDetalleColeccion
 import com.example.kiniroboard.ui.PantallaFormulario
 import com.example.kiniroboard.ui.PantallaInicio
-import com.example.kiniroboard.ui.PantallaTableroPrincipal
 import com.example.kiniroboard.ui.theme.KiniroBoardTheme
 import com.example.kiniroboard.viewmodel.KiniroViewModel
 import com.example.kiniroboard.viewmodel.KiniroViewModelFactory
@@ -36,21 +34,13 @@ class MainActivity : ComponentActivity() {
                 val viewModel: KiniroViewModel = viewModel(factory = viewModelFactory)
                 val navController = rememberNavController()
 
-                // Convierte el texto de la ruta ("MANGAS") en la categoría del enum
-                fun categoriaDe(valor: String?): Categoria =
-                    Categoria.entries.firstOrNull { it.name == valor } ?: Categoria.ANIME
+                NavHost(navController = navController, startDestination = "inicio") {
 
-                NavHost(
-                    navController = navController,
-                    startDestination = "inicio"
-                ) {
                     // ① INICIO
                     composable("inicio") {
                         PantallaInicio(
                             viewModel = viewModel,
-                            onAbrirCategoria = { categoria ->
-                                navController.navigate("categoria/${categoria.name}")
-                            }
+                            onAbrirCategoria = { navController.navigate("categoria/${it.name}") }
                         )
                     }
 
@@ -59,18 +49,18 @@ class MainActivity : ComponentActivity() {
                         route = "categoria/{cat}",
                         arguments = listOf(navArgument("cat") { type = NavType.StringType })
                     ) { entrada ->
-                        val categoria = categoriaDe(entrada.arguments?.getString("cat"))
+                        val categoria = categoriaPorNombre(entrada.arguments?.getString("cat"))
                         PantallaCategoria(
                             categoria = categoria,
                             viewModel = viewModel,
                             onVolver = { navController.popBackStack() },
-                            onNuevo = { navController.navigate("formulario/${categoria.name}") },              // ← CAMBIÓ
-                            onEditar = { id -> navController.navigate("formulario/${categoria.name}?obraId=$id") }, // ← CAMBIÓ
-                            onCronologia = { /* TEMPORAL: Fase 7 */ }
+                            onNuevo = { navController.navigate("formulario/${categoria.name}") },
+                            onEditar = { id -> navController.navigate("formulario/${categoria.name}?obraId=$id") },
+                            onCronologia = { /* Fase 8B */ }
                         )
                     }
 
-                    // ③ FORMULARIO (crear y editar)   ← NUEVO
+                    // ③ FORMULARIO (crear y editar)
                     composable(
                         route = "formulario/{cat}?obraId={obraId}",
                         arguments = listOf(
@@ -79,32 +69,10 @@ class MainActivity : ComponentActivity() {
                         )
                     ) { entrada ->
                         PantallaFormulario(
-                            categoria = categoriaDe(entrada.arguments?.getString("cat")),
+                            categoria = categoriaPorNombre(entrada.arguments?.getString("cat")),
                             obraId = entrada.arguments?.getInt("obraId")?.takeIf { it > 0 },
                             viewModel = viewModel,
                             onCerrar = { navController.popBackStack() }
-                        )
-                    }
-
-                    // ④ VIEJAS: se borran en la Fase 7
-                    composable("tablero_principal") {
-                        PantallaTableroPrincipal(
-                            viewModel = viewModel,
-                            onSeleccionarColeccion = { coleccionId ->
-                                navController.navigate("detalle_coleccion/$coleccionId")
-                            }
-                        )
-                    }
-
-                    composable(
-                        route = "detalle_coleccion/{coleccionId}",
-                        arguments = listOf(navArgument("coleccionId") { type = NavType.IntType })
-                    ) { backStackEntry ->
-                        val coleccionId = backStackEntry.arguments?.getInt("coleccionId") ?: 0
-                        PantallaDetalleColeccion(
-                            coleccionId = coleccionId,
-                            viewModel = viewModel,
-                            onVolver = { navController.popBackStack() }
                         )
                     }
                 }

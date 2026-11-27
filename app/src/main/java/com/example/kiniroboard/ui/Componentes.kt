@@ -159,7 +159,7 @@ fun MenuFlor(abierto: Boolean, onAlternar: () -> Unit, onNuevo: () -> Unit, onCr
         ) {
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OpcionMenu("Nuevo", Icons.Filled.Add, onNuevo)
-                OpcionMenu("Cronología", Icons.Filled.Timeline, onCronologia)
+                //OpcionMenu("Cronología", Icons.Filled.Timeline, onCronologia)
             }
         }
         BotonFlor(abierto = abierto, onClick = onAlternar)
