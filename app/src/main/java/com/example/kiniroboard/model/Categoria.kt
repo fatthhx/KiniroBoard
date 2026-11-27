@@ -37,3 +37,11 @@ enum class Categoria(
 enum class Estado { POR_VER, EMPEZADO, FINALIZADO }
 
 enum class Filtro { PENDIENTES, EMPEZADOS, FINALIZADOS, TODOS }
+
+// Texto de cada pestaña según la categoría ("Por ver"/"Por leer", "Empezados"/"Empezadas"...)
+fun Filtro.etiqueta(categoria: Categoria): String = when (this) {
+    Filtro.PENDIENTES -> categoria.pendiente
+    Filtro.EMPEZADOS -> categoria.genero("Empezados", "Empezadas")
+    Filtro.FINALIZADOS -> categoria.genero("Finalizados", "Finalizadas")
+    Filtro.TODOS -> categoria.genero("Todos", "Todas")
+}

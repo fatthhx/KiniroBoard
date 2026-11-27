@@ -61,7 +61,7 @@ class FlorShape(private val petalos: Int = 8) : Shape {
         val cx = size.width / 2f
         val cy = size.height / 2f
         val radio = min(cx, cy)
-        val pasos = 160
+        val pasos = 64
         for (i in 0..pasos) {
             val t = 2.0 * PI * i / pasos
             val r = radio * (0.9f + 0.1f * cos(petalos * t).toFloat())
@@ -138,7 +138,6 @@ fun BotonFlor(abierto: Boolean, onClick: () -> Unit) {
         shape = FlorShape(),
         color = InkBlack,
         border = BorderStroke(2.dp, KiniroNeonGreen),
-        shadowElevation = 6.dp,
         modifier = Modifier
             .size(68.dp)
             .semantics { contentDescription = if (abierto) "Cerrar menú" else "Abrir menú: nuevo o cronología" }
