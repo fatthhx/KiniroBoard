@@ -13,6 +13,7 @@ import androidx.navigation.navArgument
 import com.example.kiniroboard.data.KiniroDatabase
 import com.example.kiniroboard.repository.KiniroRepository
 import com.example.kiniroboard.ui.PantallaDetalleColeccion
+import com.example.kiniroboard.ui.PantallaInicio
 import com.example.kiniroboard.ui.PantallaTableroPrincipal
 import com.example.kiniroboard.ui.theme.KiniroBoardTheme
 import com.example.kiniroboard.viewmodel.KiniroViewModel
@@ -24,7 +25,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         val database = KiniroDatabase.getDatabase(applicationContext)
-        val repository = KiniroRepository(database.kiniroDao())
+        val repository = KiniroRepository(database)
         val viewModelFactory = KiniroViewModelFactory(repository)
 
         setContent {
@@ -34,8 +35,19 @@ class MainActivity : ComponentActivity() {
 
                 NavHost(
                     navController = navController,
-                    startDestination = "tablero_principal"
+                    startDestination = "inicio"
                 ) {
+                    // NUEVA: pantalla de inicio con las píldoras
+                    composable("inicio") {
+                        PantallaInicio(
+                            viewModel = viewModel,
+                            onAbrirCategoria = {
+                                // TEMPORAL: en la Fase 5 irá a la pantalla de la categoría
+                                navController.navigate("tablero_principal")
+                            }
+                        )
+                    }
+
                     composable("tablero_principal") {
                         PantallaTableroPrincipal(
                             viewModel = viewModel,
@@ -61,3 +73,4 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
